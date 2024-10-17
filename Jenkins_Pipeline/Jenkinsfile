@@ -1,0 +1,69 @@
+pipeline {
+    agent any
+    environment {
+        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
+        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
+        AWS_DEFAULT_REGION = 'eu-west-1'
+    }
+
+    stages {
+        stage('git Checkout SCM') {
+            steps {
+                script {
+                    checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[credentialsId: 'git-cred', url: 'https://github.com/Godfrey22152/Automated-EKS-Cluster-Deployment-Pipeline.git']])
+                }
+            }
+        }
+        
+        stage('Initialize the working directory') {
+            steps {
+                script {
+                    dir('aws_eks_terraform_files'){
+                        sh 'terraform init'
+                    }
+                }
+            }
+        }
+        
+        stage('Validate the configuration files') {
+            steps {
+                script {
+                    dir('aws_eks_terraform_files'){
+                        sh 'terraform validate'
+                    }
+                }
+            }
+        }
+        
+        stage('Format Terraform configuration files') {
+            steps {
+                script {
+                    dir('aws_eks_terraform_files'){
+                        sh 'terraform fmt'
+                    }
+                }
+            }
+        }
+        
+        stage('Generate and review the execution plan') {
+            steps {
+                script {
+                    dir('aws_eks_terraform_files'){
+                        sh 'terraform plan'
+                    }
+                    input(message: "Approve?", ok: "proceed")
+                }
+            }
+        }
+        
+        stage('Create/Destroy an EKS cluster') {
+            steps {
+                script {
+                    dir('aws_eks_terraform_files'){
+                        sh 'terraform $action --auto-approve'
+                    }
+                }
+            }
+        }
+    }
+}
